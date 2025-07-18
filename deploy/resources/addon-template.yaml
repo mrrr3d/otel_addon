@@ -7,23 +7,15 @@ spec:
   agentSpec:
     workload:
       manifests:
-        - apiVersion: v1
-          kind: Namespace
-          metadata:
-            labels:
-              pod-security.kubernetes.io/audit: privileged
-              pod-security.kubernetes.io/enforce: privileged
-              pod-security.kubernetes.io/warn: privileged
-              security.openshift.io/scc.podSecurityLabelSync: "false"
-              sustainable-computing.io/app: kepler
-            name: kepler
+        ## kepler
+        # Create namespace monitoring-addon first
         - apiVersion: v1
           kind: ServiceAccount
           metadata:
             labels:
               sustainable-computing.io/app: kepler
             name: kepler-sa
-            namespace: kepler
+            namespace: monitoring-addon
         - apiVersion: rbac.authorization.k8s.io/v1
           kind: ClusterRole
           metadata:
@@ -55,7 +47,7 @@ spec:
           subjects:
             - kind: ServiceAccount
               name: kepler-sa
-              namespace: kepler
+              namespace: monitoring-addon
         - apiVersion: v1
           data:
             BIND_ADDRESS: 0.0.0.0:9102
@@ -68,7 +60,7 @@ spec:
             EXPOSE_HW_COUNTER_METRICS: "true"
             EXPOSE_IRQ_COUNTER_METRICS: "true"
             KEPLER_LOG_LEVEL: "1"
-            KEPLER_NAMESPACE: kepler
+            KEPLER_NAMESPACE: monitoring-addon
             METRIC_PATH: /metrics
             MODEL_CONFIG: |
               CONTAINER_COMPONENTS_ESTIMATOR=false
@@ -80,7 +72,7 @@ spec:
             labels:
               sustainable-computing.io/app: kepler
             name: kepler-cfm
-            namespace: kepler
+            namespace: monitoring-addon
         - apiVersion: v1
           data:
             redfish.csv: |
@@ -91,7 +83,7 @@ spec:
             labels:
               sustainable-computing.io/app: kepler
             name: redfish-4kh9d7bc7m
-            namespace: kepler
+            namespace: monitoring-addon
           type: Opaque
         - apiVersion: v1
           kind: Service
@@ -101,7 +93,7 @@ spec:
               app.kubernetes.io/name: kepler-exporter
               sustainable-computing.io/app: kepler
             name: kepler-exporter
-            namespace: kepler
+            namespace: monitoring-addon
           spec:
             clusterIP: None
             ports:
@@ -118,7 +110,7 @@ spec:
             labels:
               sustainable-computing.io/app: kepler
             name: kepler-exporter
-            namespace: kepler
+            namespace: monitoring-addon
           spec:
             selector:
               matchLabels:
@@ -219,6 +211,139 @@ spec:
                   - name: redfish
                     secret:
                       secretName: redfish-4kh9d7bc7m
+
+        ## otel collector
+        # - apiVersion: v1
+        #   kind: ConfigMap
+        #   metadata:
+        #     name: otel-collector-conf
+        #     namespace: open-cluster-management-addon
+        #     labels:
+        #       app: opentelemetry
+        #       component: otel-collector-conf
+        #   data:
+        #     otel-collector-config: |
+        #       receivers:
+        #         otlp:
+        #           protocols:
+        #             grpc:
+        #               endpoint: ${env:MY_POD_IP}:4317
+        #             http:
+        #               endpoint: ${env:MY_POD_IP}:4318
+        #       processors:
+        #         batch:
+        #         memory_limiter:
+        #           limit_mib: 1500
+        #           spike_limit_mib: 512
+        #           check_interval: 5s
+        #       extensions:
+        #         zpages: {}
+        #       exporters:
+        #         prometheusremotewrite:
+        #           endpoint: {{PROM_REMOTE_WRITE_ENDPOINT}}
+        #           tls:
+        #             insecure: false
+        #             cert_file: /managed/open-cluster-management.io-otel-addon/tls.crt
+        #             key_file: /managed/open-cluster-management.io-otel-addon/tls.key
+        #             ca_file: /prom-certs/ca.crt
+        #           external_labels:
+        #             cluster_name: {{CLUSTER_NAME}}
+        #       service:
+        #         extensions: [zpages]
+        #         pipelines:
+        #           traces/1:
+        #             receivers: [otlp]
+        #             processors: [memory_limiter, batch]
+        #             exporters: [otlp]
+        # - apiVersion: v1
+        #   kind: Service
+        #   metadata:
+        #     name: otel-collector
+        #     labels:
+        #       app: opentelemetry
+        #       component: otel-collector
+        #   spec:
+        #     ports:
+        #       - name: otlp-grpc # Default endpoint for OpenTelemetry gRPC receiver.
+        #         port: 4317
+        #         protocol: TCP
+        #         targetPort: 4317
+        #       - name: otlp-http # Default endpoint for OpenTelemetry HTTP receiver.
+        #         port: 4318
+        #         protocol: TCP
+        #         targetPort: 4318
+        #       - name: metrics # Default endpoint for querying metrics.
+        #         port: 8888
+        #     selector:
+        #       component: otel-collector
+        # - apiVersion: apps/v1
+        #   kind: Deployment
+        #   metadata:
+        #     name: otel-collector
+        #     labels:
+        #       app: opentelemetry
+        #       component: otel-collector
+        #   spec:
+        #     selector:
+        #       matchLabels:
+        #         app: opentelemetry
+        #         component: otel-collector
+        #     minReadySeconds: 5
+        #     progressDeadlineSeconds: 120
+        #     replicas: 1 #TODO - adjust this to your own requirements
+        #     template:
+        #       metadata:
+        #         labels:
+        #           app: opentelemetry
+        #           component: otel-collector
+        #       spec:
+        #         containers:
+        #           - command:
+        #               - "/otelcol"
+        #               - "--config=/conf/otel-collector-config.yaml"
+        #             image: otel/opentelemetry-collector:latest
+        #             name: otel-collector
+        #             resources:
+        #               limits:
+        #                 cpu: 1
+        #                 memory: 2Gi
+        #               requests:
+        #                 cpu: 200m
+        #                 memory: 400Mi
+        #             ports:
+        #               - containerPort: 55679 # Default endpoint for ZPages.
+        #               - containerPort: 4317 # Default endpoint for OpenTelemetry receiver.
+        #               - containerPort: 14250 # Default endpoint for Jaeger gRPC receiver.
+        #               - containerPort: 14268 # Default endpoint for Jaeger HTTP receiver.
+        #               - containerPort: 9411 # Default endpoint for Zipkin receiver.
+        #               - containerPort: 8888 # Default endpoint for querying metrics.
+        #             env:
+        #               - name: MY_POD_IP
+        #                 valueFrom:
+        #                   fieldRef:
+        #                     apiVersion: v1
+        #                     fieldPath: status.podIP
+        #               - name: GOMEMLIMIT
+        #                 value: 1600MiB
+        #             volumeMounts:
+        #               - name: otel-collector-config-vol
+        #                 mountPath: /conf
+        #                 #        - name: otel-collector-secrets
+        #                 #          mountPath: /secrets
+        #         volumes:
+        #           - configMap:
+        #               name: otel-collector-conf
+        #               items:
+        #                 - key: otel-collector-config
+        #                   path: otel-collector-config.yaml
+        #             name: otel-collector-config-vol
+        #   #        - secret:
+        #   #            name: otel-collector-secrets
+        #   #            items:
+        #   #              - key: cert.pem
+        #   #                path: cert.pem
+        #   #              - key: key.pem
+        #   #                path: key.pem
   registration:
     - type: CustomSigner
       customSigner:
