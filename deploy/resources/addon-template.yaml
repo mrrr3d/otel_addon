@@ -212,138 +212,270 @@ spec:
                     secret:
                       secretName: redfish-4kh9d7bc7m
 
-        ## otel collector
-        # - apiVersion: v1
-        #   kind: ConfigMap
-        #   metadata:
-        #     name: otel-collector-conf
-        #     namespace: open-cluster-management-addon
-        #     labels:
-        #       app: opentelemetry
-        #       component: otel-collector-conf
-        #   data:
-        #     otel-collector-config: |
-        #       receivers:
-        #         otlp:
-        #           protocols:
-        #             grpc:
-        #               endpoint: ${env:MY_POD_IP}:4317
-        #             http:
-        #               endpoint: ${env:MY_POD_IP}:4318
-        #       processors:
-        #         batch:
-        #         memory_limiter:
-        #           limit_mib: 1500
-        #           spike_limit_mib: 512
-        #           check_interval: 5s
-        #       extensions:
-        #         zpages: {}
-        #       exporters:
-        #         prometheusremotewrite:
-        #           endpoint: {{PROM_REMOTE_WRITE_ENDPOINT}}
-        #           tls:
-        #             insecure: false
-        #             cert_file: /managed/open-cluster-management.io-otel-addon/tls.crt
-        #             key_file: /managed/open-cluster-management.io-otel-addon/tls.key
-        #             ca_file: /prom-certs/ca.crt
-        #           external_labels:
-        #             cluster_name: {{CLUSTER_NAME}}
-        #       service:
-        #         extensions: [zpages]
-        #         pipelines:
-        #           traces/1:
-        #             receivers: [otlp]
-        #             processors: [memory_limiter, batch]
-        #             exporters: [otlp]
-        # - apiVersion: v1
-        #   kind: Service
-        #   metadata:
-        #     name: otel-collector
-        #     labels:
-        #       app: opentelemetry
-        #       component: otel-collector
-        #   spec:
-        #     ports:
-        #       - name: otlp-grpc # Default endpoint for OpenTelemetry gRPC receiver.
-        #         port: 4317
-        #         protocol: TCP
-        #         targetPort: 4317
-        #       - name: otlp-http # Default endpoint for OpenTelemetry HTTP receiver.
-        #         port: 4318
-        #         protocol: TCP
-        #         targetPort: 4318
-        #       - name: metrics # Default endpoint for querying metrics.
-        #         port: 8888
-        #     selector:
-        #       component: otel-collector
-        # - apiVersion: apps/v1
-        #   kind: Deployment
-        #   metadata:
-        #     name: otel-collector
-        #     labels:
-        #       app: opentelemetry
-        #       component: otel-collector
-        #   spec:
-        #     selector:
-        #       matchLabels:
-        #         app: opentelemetry
-        #         component: otel-collector
-        #     minReadySeconds: 5
-        #     progressDeadlineSeconds: 120
-        #     replicas: 1 #TODO - adjust this to your own requirements
-        #     template:
-        #       metadata:
-        #         labels:
-        #           app: opentelemetry
-        #           component: otel-collector
-        #       spec:
-        #         containers:
-        #           - command:
-        #               - "/otelcol"
-        #               - "--config=/conf/otel-collector-config.yaml"
-        #             image: otel/opentelemetry-collector:latest
-        #             name: otel-collector
-        #             resources:
-        #               limits:
-        #                 cpu: 1
-        #                 memory: 2Gi
-        #               requests:
-        #                 cpu: 200m
-        #                 memory: 400Mi
-        #             ports:
-        #               - containerPort: 55679 # Default endpoint for ZPages.
-        #               - containerPort: 4317 # Default endpoint for OpenTelemetry receiver.
-        #               - containerPort: 14250 # Default endpoint for Jaeger gRPC receiver.
-        #               - containerPort: 14268 # Default endpoint for Jaeger HTTP receiver.
-        #               - containerPort: 9411 # Default endpoint for Zipkin receiver.
-        #               - containerPort: 8888 # Default endpoint for querying metrics.
-        #             env:
-        #               - name: MY_POD_IP
-        #                 valueFrom:
-        #                   fieldRef:
-        #                     apiVersion: v1
-        #                     fieldPath: status.podIP
-        #               - name: GOMEMLIMIT
-        #                 value: 1600MiB
-        #             volumeMounts:
-        #               - name: otel-collector-config-vol
-        #                 mountPath: /conf
-        #                 #        - name: otel-collector-secrets
-        #                 #          mountPath: /secrets
-        #         volumes:
-        #           - configMap:
-        #               name: otel-collector-conf
-        #               items:
-        #                 - key: otel-collector-config
-        #                   path: otel-collector-config.yaml
-        #             name: otel-collector-config-vol
-        #   #        - secret:
-        #   #            name: otel-collector-secrets
-        #   #            items:
-        #   #              - key: cert.pem
-        #   #                path: cert.pem
-        #   #              - key: key.pem
-        #   #                path: key.pem
+
+
+
+
+        # otel collector
+        - apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: opentelemetry-collector
+            namespace: monitoring-addon
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app.kubernetes.io/instance: opentelemetry-collector
+                app.kubernetes.io/name: opentelemetry-collector
+                component: standalone-collector
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/instance: opentelemetry-collector
+                  app.kubernetes.io/name: opentelemetry-collector
+                  component: standalone-collector
+              spec:
+                containers:
+                  - args:
+                      - --config=/conf/relay.yaml
+                    command:
+                      - /otelcol-contrib
+                    env:
+                      - name: MY_POD_IP
+                        valueFrom:
+                          fieldRef:
+                            apiVersion: v1
+                            fieldPath: status.podIP
+                      - name: K8S_NODE_NAME
+                        valueFrom:
+                          fieldRef:
+                            apiVersion: v1
+                            fieldPath: spec.nodeName
+                    image: otel/opentelemetry-collector-contrib:0.128.0
+                    imagePullPolicy: IfNotPresent
+                    livenessProbe:
+                      failureThreshold: 3
+                      httpGet:
+                        path: /
+                        port: 13133
+                        scheme: HTTP
+                      periodSeconds: 10
+                      successThreshold: 1
+                      timeoutSeconds: 1
+                    name: opentelemetry-collector
+                    ports:
+                      - containerPort: 6831
+                        name: jaeger-compact
+                        protocol: UDP
+                      - containerPort: 14250
+                        name: jaeger-grpc
+                        protocol: TCP
+                      - containerPort: 14268
+                        name: jaeger-thrift
+                        protocol: TCP
+                      - containerPort: 4317
+                        name: otlp
+                        protocol: TCP
+                      - containerPort: 4318
+                        name: otlp-http
+                        protocol: TCP
+                      - containerPort: 9411
+                        name: zipkin
+                        protocol: TCP
+                    readinessProbe:
+                      failureThreshold: 3
+                      httpGet:
+                        path: /
+                        port: 13133
+                        scheme: HTTP
+                      periodSeconds: 10
+                      successThreshold: 1
+                      timeoutSeconds: 1
+                    resources: {}
+                    securityContext: {}
+                    terminationMessagePath: /dev/termination-log
+                    terminationMessagePolicy: File
+                    volumeMounts:
+                    - mountPath: /conf
+                      name: opentelemetry-collector-configmap
+                    - mountPath: /prom-certs
+                      name: prom-web-root-ca
+                dnsPolicy: ClusterFirst
+                restartPolicy: Always
+                schedulerName: default-scheduler
+                securityContext: {}
+                serviceAccount: opentelemetry-collector-sa
+                serviceAccountName: opentelemetry-collector-sa
+                terminationGracePeriodSeconds: 30
+                volumes:
+                - configMap:
+                    defaultMode: 420
+                    items:
+                      - key: relay
+                        path: relay.yaml
+                    name: opentelemetry-collector
+                  name: opentelemetry-collector-configmap
+                - configMap:
+                    defaultMode: 420
+                    items:
+                      - key: ca.crt
+                        path: ca.crt
+                    name: prom-web-root-ca
+                  name: prom-web-root-ca
+        - apiVersion: v1
+          data:
+            relay: |
+              exporters:
+                debug: {}
+                prometheusremotewrite:
+                  endpoint: {{PROM_REMOTE_WRITE_ENDPOINT}}
+                  tls:
+                    insecure: false
+                    cert_file: /managed/open-cluster-management.io-otel-addon/tls.crt
+                    key_file: /managed/open-cluster-management.io-otel-addon/tls.key
+                    ca_file: /prom-certs/ca.crt
+                  external_labels:
+                    cluster_name: {{CLUSTER_NAME}}
+              extensions:
+                health_check:
+                  endpoint: ${env:MY_POD_IP}:13133
+              processors:
+                batch: {}
+              receivers:
+                otlp:
+                  protocols:
+                    grpc:
+                      endpoint: 0.0.0.0:4317
+                    http:
+                      endpoint: 0.0.0.0:4318
+                prometheus:
+                  config:
+                    scrape_configs:
+                      - job_name: opentelemetry-collector
+                        metrics_path: /metrics/cadvisor
+                        scheme: https
+                        tls_config:
+                          insecure_skip_verify: true
+                          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+                        kubernetes_sd_configs:
+                          - role: node
+                        relabel_configs:
+                          - action: labelmap
+                            regex: __meta_kubernetes_node_label_(.+)
+                        scrape_interval: 10s
+                      - job_name: 'kepler-pods'
+                        kubernetes_sd_configs:
+                          - role: pod
+                        relabel_configs:
+                          - source_labels: [__meta_kubernetes_namespace]
+                            action: keep
+                            regex: monitoring-addon
+                          - source_labels: [__meta_kubernetes_pod_label_sustainable_computing_io_app]
+                            action: keep
+                            regex: kepler
+                          - source_labels: [__address__, __meta_kubernetes_pod_container_port_number]
+                            action: replace
+                            regex: ([^:]+):(?:\d+);(\d+)
+                            replacement: $${1}:$${2}
+                            target_label: __address__
+                          - source_labels: [__meta_kubernetes_node_name]
+                            action: replace
+                            target_label: instance
+                    
+              service:
+                extensions:
+                - health_check
+                pipelines:
+                  metrics:
+                    exporters:
+                    - prometheusremotewrite
+                    processors:
+                    - batch
+                    receivers:
+                    - prometheus
+                    - otlp
+          kind: ConfigMap
+          metadata:
+            name: opentelemetry-collector
+            namespace: monitoring-addon
+        - apiVersion: v1
+          data:
+            ca.crt: |
+              -----BEGIN CERTIFICATE-----
+              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
+              -----END CERTIFICATE-----
+          kind: ConfigMap
+          metadata:
+            name: prom-web-root-ca
+            namespace: monitoring-addon
+        - apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: opentelemetry-collector-sa
+            namespace: monitoring-addon
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: otel-clusterrole
+          rules:
+            - nonResourceURLs:
+                - /metrics
+                - /metrics/cadvisor
+              verbs:
+                - get
+            - apiGroups:
+                - ""
+              resources:
+                - nodes
+                - nodes/metrics
+                - nodes/proxy
+                - nodes/stats
+                - services
+                - pods
+              verbs:
+                - get
+                - list
+                - watch
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: otel-clusterrolebinding
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: otel-clusterrole
+          subjects:
+            - kind: ServiceAccount
+              name: opentelemetry-collector-sa
+              namespace: monitoring-addon
   registration:
     - type: CustomSigner
       customSigner:
