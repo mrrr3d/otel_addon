@@ -437,6 +437,27 @@ spec:
             name: prom-web-root-ca
             namespace: monitoring-addon
         - apiVersion: v1
+          kind: Service
+          metadata:
+            name: otel-collector
+            namespace: monitoring-addon
+            labels:
+              app.kubernetes.io/instance: opentelemetry-collector
+              app.kubernetes.io/name: opentelemetry-collector
+              component: otel-collector-svc
+          spec:
+            ports:
+            - name: otlp-grpc # Default endpoint for OpenTelemetry gRPC receiver.
+              port: 4317
+              protocol: TCP
+              targetPort: 4317
+            - name: otlp-http # Default endpoint for OpenTelemetry HTTP receiver.
+              port: 4318
+              protocol: TCP
+              targetPort: 4318
+            selector:
+              component: standalone-collector
+        - apiVersion: v1
           kind: ServiceAccount
           metadata:
             name: opentelemetry-collector-sa
