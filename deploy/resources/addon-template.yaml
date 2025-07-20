@@ -404,35 +404,7 @@ spec:
         - apiVersion: v1
           data:
             ca.crt: |
-              -----BEGIN CERTIFICATE-----
-              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
-              -----END CERTIFICATE-----
+              PROM_WEB_ROOT_CA
           kind: ConfigMap
           metadata:
             name: prom-web-root-ca
