@@ -2,7 +2,7 @@ apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
   name: global
-  namespace: open-cluster-management-addon
+  namespace: monitoring-addon
 spec:
   clusterSet: global
 
@@ -12,7 +12,7 @@ apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
 metadata:
   name: otel-addon
-  namespace: open-cluster-management-addon
+  namespace: monitoring-addon
 spec:
   clusterSets:
     - global
@@ -21,9 +21,3 @@ spec:
     operator: Equal
   - key: cluster.open-cluster-management.io/unavailable
     operator: Equal
-  predicates:
-  - requiredClusterSelector:
-      labelSelector:
-        matchExpressions:
-          - key: local-cluster
-            operator: DoesNotExist
