@@ -330,6 +330,8 @@ spec:
                 debug: {}
                 prometheusremotewrite:
                   endpoint: {{PROM_REMOTE_WRITE_ENDPOINT}}
+                  resource_to_telemetry_conversion:
+                    enabled: true
                   tls:
                     insecure: false
                     cert_file: /managed/open-cluster-management.io-otel-addon/tls.crt
