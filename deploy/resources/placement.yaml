@@ -2,7 +2,7 @@ apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
   name: global
-  namespace: monitoring-addon
+  namespace: open-cluster-management-addon
 spec:
   clusterSet: global
 
@@ -12,7 +12,7 @@ apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
 metadata:
   name: otel-addon
-  namespace: monitoring-addon
+  namespace: open-cluster-management-addon
 spec:
   clusterSets:
     - global

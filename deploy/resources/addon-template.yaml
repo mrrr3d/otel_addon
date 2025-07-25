@@ -8,14 +8,13 @@ spec:
     workload:
       manifests:
         ## kepler
-        # Create namespace monitoring-addon first
         - apiVersion: v1
           kind: ServiceAccount
           metadata:
             labels:
               sustainable-computing.io/app: kepler
             name: kepler-sa
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
         - apiVersion: rbac.authorization.k8s.io/v1
           kind: ClusterRole
           metadata:
@@ -47,7 +46,7 @@ spec:
           subjects:
             - kind: ServiceAccount
               name: kepler-sa
-              namespace: monitoring-addon
+              namespace: open-cluster-management-addon
         - apiVersion: v1
           data:
             BIND_ADDRESS: 0.0.0.0:9102
@@ -60,7 +59,7 @@ spec:
             EXPOSE_HW_COUNTER_METRICS: "true"
             EXPOSE_IRQ_COUNTER_METRICS: "true"
             KEPLER_LOG_LEVEL: "1"
-            KEPLER_NAMESPACE: monitoring-addon
+            KEPLER_NAMESPACE: open-cluster-management-addon
             METRIC_PATH: /metrics
             MODEL_CONFIG: |
               CONTAINER_COMPONENTS_ESTIMATOR=false
@@ -72,7 +71,7 @@ spec:
             labels:
               sustainable-computing.io/app: kepler
             name: kepler-cfm
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
         - apiVersion: v1
           data:
             redfish.csv: |
@@ -83,7 +82,7 @@ spec:
             labels:
               sustainable-computing.io/app: kepler
             name: redfish-4kh9d7bc7m
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
           type: Opaque
         - apiVersion: v1
           kind: Service
@@ -93,7 +92,7 @@ spec:
               app.kubernetes.io/name: kepler-exporter
               sustainable-computing.io/app: kepler
             name: kepler-exporter
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
           spec:
             clusterIP: None
             ports:
@@ -110,7 +109,7 @@ spec:
             labels:
               sustainable-computing.io/app: kepler
             name: kepler-exporter
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
           spec:
             selector:
               matchLabels:
@@ -221,7 +220,7 @@ spec:
           kind: Deployment
           metadata:
             name: opentelemetry-collector
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
           spec:
             replicas: 1
             selector:
@@ -373,7 +372,7 @@ spec:
                         relabel_configs:
                           - source_labels: [__meta_kubernetes_namespace]
                             action: keep
-                            regex: monitoring-addon
+                            regex: open-cluster-management-addon
                           - source_labels: [__meta_kubernetes_pod_label_sustainable_computing_io_app]
                             action: keep
                             regex: kepler
@@ -402,7 +401,7 @@ spec:
           kind: ConfigMap
           metadata:
             name: opentelemetry-collector
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
         - apiVersion: v1
           data:
             ca.crt: |
@@ -410,12 +409,12 @@ spec:
           kind: ConfigMap
           metadata:
             name: prom-web-root-ca
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
         - apiVersion: v1
           kind: Service
           metadata:
             name: otel-collector
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
             labels:
               app.kubernetes.io/instance: opentelemetry-collector
               app.kubernetes.io/name: opentelemetry-collector
@@ -436,7 +435,7 @@ spec:
           kind: ServiceAccount
           metadata:
             name: opentelemetry-collector-sa
-            namespace: monitoring-addon
+            namespace: open-cluster-management-addon
         - apiVersion: rbac.authorization.k8s.io/v1
           kind: ClusterRole
           metadata:
@@ -471,7 +470,7 @@ spec:
           subjects:
             - kind: ServiceAccount
               name: opentelemetry-collector-sa
-              namespace: monitoring-addon
+              namespace: open-cluster-management-addon
   registration:
     - type: CustomSigner
       customSigner:

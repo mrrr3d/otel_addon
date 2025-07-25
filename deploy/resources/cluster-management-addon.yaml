@@ -9,7 +9,7 @@ spec:
     type: Placements
     placements:
     - name: otel-addon
-      namespace: monitoring-addon
+      namespace: open-cluster-management-addon
       configs:
       - name: otel-addon
         group: addon.open-cluster-management.io

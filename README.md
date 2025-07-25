@@ -91,9 +91,7 @@ This add-on deploys the necessary components (Kepler exporter and OTel collector
 
 First, create a namespace for the add-on on all clusters:
 ```shell
-kubectl --context kind-hub create namespace monitoring-addon
-kubectl --context kind-cluster1 create namespace monitoring-addon
-kubectl --context kind-cluster2 create namespace monitoring-addon
+kubectl --context kind-hub create namespace open-cluster-management-addon
 ```
 
 Then, apply the Kustomization to deploy the add-on resources:
